@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>AI 学习模块阅读器</title>
+  <!-- FOUC guard: applies the saved theme before first paint. Must stay above every
+       stylesheet — running this on DOMContentLoaded is what causes the white flash. -->
+  <script>
+    (function () {
+      var t = localStorage.getItem('ltm_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+  <!-- Google Fonts: Outfit & Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/scripts/viz.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <button id="sidebarToggle" class="icon-button" type="button" data-i18n-aria="sidebarToggleAria" data-i18n-title="sidebarToggleTitle" aria-label="折叠/展开侧栏" title="切换左侧栏">☰</button>
+      <div id="documentTitle" class="document-title" data-i18n="documentTitleEmpty">选择一篇内容</div>
+    </div>
+    <div class="header-actions">
+      <button id="themeButton" class="pill-button" type="button" data-i18n-aria="themeAria" data-i18n-title="themeTitle" aria-label="切换主题" title="切换主题">
+        <span class="pill-icon" aria-hidden="true">☀</span><span class="pill-label" data-i18n="themeLabel">Light Mode</span>
+      </button>
+      <!-- 保存状态指示器：既是状态显示，也是手动保存按钮（frontend_spec §6.3） -->
+      <button id="saveStatus" class="save-status" type="button" data-state="idle"
+              data-i18n-title="saveStatusTitle" data-i18n-aria="saveStatusAria" title="保存状态 —— 点击立即保存（⌘S / Ctrl+S）" aria-label="保存状态：点击立即保存" aria-live="polite">
+        <span class="save-icon" aria-hidden="true">○</span><span class="save-label" data-i18n="statusIdle">就绪</span>
+      </button>
+      <button id="tocToggle" class="pill-button" type="button" data-i18n-aria="tocToggleAria" data-i18n-title="tocToggleTitle" aria-label="切换章节目录" title="切换右侧章节目录">
+        <span class="pill-icon" aria-hidden="true">🧭</span><span class="pill-label" data-i18n="tocToggleLabel">章节目录</span>
+      </button>
+      <button id="exportButton" class="pill-button primary" type="button" disabled>
+        <span class="pill-icon" aria-hidden="true">⬇</span><span class="pill-label" data-i18n="exportLabel">导出</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand-section">
+        <div class="brand-mark">L</div>
+        <div class="brand-info">
+          <strong>Learning Reader</strong>
+          <small>Magazine + Unit</small>
+        </div>
+      </div>
+
+      <nav class="tabs" data-i18n-aria="sidebarAria" aria-label="阅读器侧栏">
+        <button class="tab active" type="button" data-tab="contents"><span aria-hidden="true">📖</span><span data-i18n="tabContents">目录</span></button>
+        <button class="tab" type="button" data-tab="concepts"><span aria-hidden="true">🗂</span><span data-i18n="tabConcepts">概念</span></button>
+        <button class="tab" type="button" data-tab="notes"><span aria-hidden="true">📝</span><span data-i18n="tabNotes">注释</span></button>
+      </nav>
+
+      <div class="sidebar-search">
+        <input id="sidebarSearch" type="search" data-i18n-placeholder="searchPlaceholder" data-i18n-aria="searchAria" placeholder="🔍 搜索文档、概念、注释…" autocomplete="off" aria-label="搜索侧栏">
+      </div>
+
+      <section id="contentsPanel" class="tab-panel active" data-panel="contents">
+        <div class="panel-toolbar">
+          <span class="panel-label" data-i18n="panelLabel">Curriculum</span>
+          <button id="sortButton" type="button" data-i18n="sortAsc">↑ 旧 → 新</button>
+          <button id="refreshButton" type="button" data-i18n-aria="refreshAria" data-i18n-title="refreshTitle" aria-label="刷新" title="刷新列表">⟳</button>
+        </div>
+        <div id="contentsList" class="contents-list"></div>
+      </section>
+
+      <section id="conceptsPanel" class="tab-panel" data-panel="concepts">
+        <p class="panel-hint" data-i18n="conceptsHint">来自当前文档标题；点击可跳转。</p>
+        <div id="conceptsList" class="concepts-list empty-list" data-i18n="noDocumentOpen">尚未打开文档</div>
+      </section>
+
+      <section id="notesPanel" class="tab-panel" data-panel="notes">
+        <label class="toggle-row"><input id="showAllNotes" type="checkbox"> <span data-i18n="showAllNotesLabel">显示全部文档注释</span></label>
+        <div id="notesList" class="notes-list empty-list" data-i18n="notesEmpty">暂无注释</div>
+      </section>
+    </aside>
+
+    <main id="mainViewport" class="main-viewport">
+      <article id="reader" class="reader" aria-live="polite">
+        <div class="welcome-card">
+          <div class="welcome-icon" aria-hidden="true">📄</div>
+          <p class="eyebrow" data-i18n="welcomeEyebrow">UNIVERSAL READER</p>
+          <h1 data-i18n="welcomeTitle">学习内容会出现在这里</h1>
+          <p data-i18n-html="welcomeBody">先完成 Phase 0，再把生成的 Markdown 放入 <code>content/magazines</code> 或 <code>content/units</code>。</p>
+        </div>
+      </article>
+    </main>
+
+    <!-- 右侧章节目录 (Collapsible Right Sidebar TOC) -->
+    <aside id="tocSidebar" class="toc-sidebar collapsed">
+      <div class="toc-header">
+        <span data-i18n="tocHeader">🧭 章节目录</span>
+      </div>
+      <div class="toc-scroll-area">
+        <div id="tocList" class="toc-list">
+          <p class="empty-toc" data-i18n="noDocumentOpen">尚未打开文档</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <button id="addNoteButton" class="selection-action" type="button" data-i18n="addNoteLabel" hidden>＋ Note</button>
+
+  <dialog id="noteDialog" class="note-dialog">
+    <form id="noteForm" method="dialog">
+      <div class="dialog-heading">
+        <div><small data-i18n="noteDialogSelected">选中文本</small><strong id="noteWord"></strong></div>
+        <button id="closeNoteDialog" class="icon-button" type="button" data-i18n-aria="noteDialogCloseAria" aria-label="关闭">×</button>
+      </div>
+      <label for="noteText" data-i18n="noteDialogLabel">你的注释</label>
+      <textarea id="noteText" rows="6" data-i18n-placeholder="noteDialogPlaceholder" placeholder="写下疑问、解释或 +显式查询…"></textarea>
+      <div class="dialog-actions">
+        <button id="deleteNoteButton" class="danger" type="button" data-i18n="noteDialogDelete" hidden>删除</button>
+        <span class="dialog-spacer"></span>
+        <button id="cancelNoteButton" type="button" data-i18n="noteDialogCancel">取消</button>
+        <button class="primary" type="submit" data-i18n="noteDialogSave">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="/vendor/marked.js"></script>
+  <script src="/vendor/purify.js"></script>
+  <script src="/vendor/mermaid.js"></script>
+  <script src="/ui-strings.js"></script>
+  <script src="/reader-core.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

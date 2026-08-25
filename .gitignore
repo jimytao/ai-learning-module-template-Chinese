@@ -1,0 +1,12 @@
+notes.json.bak
+images/*
+!images/.gitkeep
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+node_modules/
+state/*.local.md
+scratch/
+.env
+*.log

@@ -1,0 +1,20 @@
+{
+  "name": "ai-learning-module-reader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local universal Markdown reader for the AI Learning Module template",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js",
+    "validate": "node scripts/validate_content.js",
+    "check": "npm test && npm run validate"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dompurify": "^3.2.6",
+    "marked": "^15.0.12",
+    "mermaid": "^11.6.0"
+  }
+}

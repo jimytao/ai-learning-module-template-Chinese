@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<!--
+  通用阅读器 —— 参考骨架 (templates/reader_skeleton.html)
+
+  protocols/p0_bootstrap.md Step 3.5 构建阅读器时的起点。
+  复制到项目根目录改名为 index.html，再补齐文件下方标注的四个 EXTENSION POINT。
+
+  已经替你写好的部分 —— 不要重写，它们正是最容易出微妙错误的地方：
+    · html[data-theme] + FOUC 守卫、亮/暗两套变量        (frontend_spec §2.5)
+    · 四个偏好键的「渲染前恢复」                          (§2.1, §7.3)
+    · 侧边栏外壳：标签页、搜索、排序切换、折叠            (§2, §3)
+    · 先吸附后测量的注释捕获                              (§4.2)
+    · applyAnnotations：全部出现都标记，只有一处 primary  (§4.3)
+    · 四级回退的 jumpToAnnotation                         (§4.4)
+
+  需要你补的：Markdown 渲染、交互控件与自动保存、可视化武器库渲染管线、注释编辑 UI。
+  每一处都在下方标为 EXTENSION POINT。
+
+  刻意不含：任何 Git UI 或 /api/git 路由（§7.4）。不要加。
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>通用阅读器</title>
+
+<!-- FOUC 守卫：必须位于所有样式表之上（§2.5.2） -->
+<script>
+  (function () {
+    var t = localStorage.getItem('ltm_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+
+<link rel="stylesheet" href="scripts/viz.css">
+<style>
+  /* ---- 设计变量。所有颜色一律走变量（§2.5.1） ---- */
+  :root {
+    --bg-app:      #0b0f19;
+    --bg-card:     #151d30;
+    --bg-sidebar:  #0e1424;
+    --border:      rgba(255, 255, 255, 0.08);
+    --text-main:   #f3f4f6;
+    --text-muted:  #9ca3af;
+    --accent:      #14b8a6;
+    --accent-hover:#0d9488;
+    --accent-soft: rgba(20, 184, 166, 0.12);
+    --mark:        #f59e0b;
+    --mark-soft:   rgba(245, 158, 11, 0.14);
+    --font-title: 'Outfit', system-ui, sans-serif;
+    --font-body:  'Inter', system-ui, sans-serif;
+    --speed: .25s;
+    --sidebar-w: 300px;
+  }
+  [data-theme="light"] {
+    --bg-app:      #f8fafc;
+    --bg-card:     #ffffff;
+    --bg-sidebar:  #f1f5f9;
+    --border:      rgba(0, 0, 0, 0.08);
+    --text-main:   #0f172a;
+    --text-muted:  #64748b;
+    --accent:      #0d9488;
+    --accent-hover:#0f766e;
+    --accent-soft: rgba(13, 148, 136, 0.10);
+    --mark:        #d97706;
+    --mark-soft:   rgba(217, 119, 6, 0.14);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh; display: flex; flex-direction: column;
+    background: var(--bg-app); color: var(--text-main);
+    font-family: var(--font-body); line-height: 1.7;
+    transition: background var(--speed), color var(--speed);
+  }
+
+  /* ---- 顶栏 ---- */
+  header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 10px 20px; border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+  .brand { font-family: var(--font-title); font-weight: 700; letter-spacing: .3px; }
+  .doc-title { flex: 1; color: var(--text-muted); font-size: 14px; }
+  .save-status { font-size: 12px; color: var(--text-muted); min-width: 64px; text-align: right; }
+  .save-status[data-state="dirty"]  { color: var(--mark); }
+  .save-status[data-state="saved"]  { color: var(--accent); }
+  .save-status[data-state="failed"] { color: #ef4444; }
+
+  button {
+    font: inherit; font-size: 12px; cursor: pointer;
+    background: transparent; color: var(--text-muted);
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px;
+    transition: background var(--speed), color var(--speed);
+  }
+  button:hover { background: var(--accent-soft); color: var(--text-main); }
+
+  /* ---- 整体框架 ---- */
+  .shell { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: var(--sidebar-w); flex: 0 0 var(--sidebar-w);
+    display: flex; flex-direction: column; min-height: 0;
+    background: var(--bg-sidebar); border-right: 1px solid var(--border);
+    transition: margin-left var(--speed);
+  }
+  body[data-sidebar="collapsed"] .sidebar { margin-left: calc(var(--sidebar-w) * -1); }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab {
+    flex: 1; border: 0; border-radius: 0; padding: 10px 4px;
+    border-bottom: 2px solid transparent;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--accent-soft); }
+
+  .sidebar-controls { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .search { flex: 1; min-width: 0; }
+  .search input {
+    width: 100%; font: inherit; font-size: 13px; padding: 6px 9px;
+    color: var(--text-main); background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 6px;
+  }
+  .search input::placeholder { color: var(--text-muted); }
+
+  .list { flex: 1; overflow-y: auto; padding: 8px; }
+  .group-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--text-muted); padding: 10px 8px 4px;
+  }
+  .item {
+    padding: 7px 10px; border-radius: 6px; font-size: 13px;
+    cursor: pointer; border: 1px solid transparent;
+  }
+  .item:hover { background: var(--accent-soft); }
+  .item.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .item .sub { display: block; font-size: 11px; color: var(--text-muted); }
+  .empty { padding: 20px 10px; font-size: 13px; color: var(--text-muted); }
+
+  /* ---- 正文 ---- */
+  .viewport { flex: 1; overflow-y: auto; padding: 32px 40px 120px; }
+  .doc { max-width: 780px; margin: 0 auto; }
+  .doc :is(h1,h2,h3,h4) { font-family: var(--font-title); line-height: 1.3; }
+  .doc table { border-collapse: collapse; width: 100%; }
+  .doc :is(th,td) { border: 1px solid var(--border); padding: 6px 10px; }
+  .doc tbody tr:nth-child(even) { background: var(--accent-soft); }
+  .doc :is(pre,code) { background: var(--bg-card); border-radius: 6px; }
+  .doc pre { padding: 12px; overflow-x: auto; }
+
+  /* ---- 注释（§4.1 —— 两种视觉上可区分的形态） ---- */
+  .annotated-word {
+    border-bottom: 2px dotted var(--accent);
+    cursor: pointer; transition: background var(--speed);
+  }
+  .annotated-word:hover { background: var(--accent-soft); }
+  .custom-highlight { background: var(--mark-soft); border-bottom-color: var(--mark); }
+  .annotated-word[data-primary="true"] { border-bottom-style: solid; }
+  .annotated-word.flash { background: var(--mark); color: #000; }
+
+  /* ---- 交互控件（§6） ---- */
+  .interactive-blank {
+    font: inherit; color: var(--accent); text-align: center;
+    background: transparent; border: 0; border-bottom: 1px solid var(--accent);
+    min-width: 60px; padding: 0 4px;
+  }
+  .interactive-textarea {
+    display: block; width: 100%; font: inherit; resize: none; overflow: hidden;
+    color: var(--text-main); background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+  }
+  .interactive-checkbox { accent-color: var(--accent); width: 15px; height: 15px; }
+
+  /* ---- 注释浮层 ---- */
+  .float {
+    position: absolute; z-index: 40; display: none; width: 300px; padding: 10px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  .float.open { display: block; }
+  .float textarea {
+    width: 100%; height: 68px; font: inherit; font-size: 13px; resize: vertical;
+    color: var(--text-main); background: var(--bg-app);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+  }
+  .float-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+  .float-actions .primary { color: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <button id="btn-collapse" title="折叠/展开侧边栏">☰</button>
+  <span class="brand">通用阅读器</span>
+  <span class="doc-title" id="doc-title">未打开文档</span>
+  <span class="save-status" id="save-status" data-state="idle"></span>
+  <button id="btn-theme" title="切换亮色 / 暗色">◐</button>
+</header>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="tabs">
+      <button class="tab active" data-tab="contents">目录</button>
+      <button class="tab" data-tab="concepts">概念</button>
+      <button class="tab" data-tab="notes">注释</button>
+    </div>
+
+    <div class="sidebar-controls">
+      <div class="search"><input id="search" type="search" placeholder="搜索…" autocomplete="off"></div>
+      <button id="btn-sort" title="切换排序">↑ 旧 → 新</button>
+      <button id="btn-notes-scope" title="注释范围" hidden>当前文档</button>
+    </div>
+
+    <div class="list" id="list"></div>
+  </aside>
+
+  <main class="viewport" id="viewport">
+    <article class="doc" id="doc"></article>
+  </main>
+</div>
+
+<!-- 新建注释 -->
+<div class="float" id="float-add">
+  <textarea id="add-note" placeholder="你的注释或猜测（留空则只做高亮）…"></textarea>
+  <div class="float-actions">
+    <button id="add-highlight">仅高亮</button>
+    <button class="primary" id="add-save">保存注释</button>
+  </div>
+</div>
+
+<!-- 编辑注释 -->
+<div class="float" id="float-edit">
+  <textarea id="edit-note"></textarea>
+  <div class="float-actions">
+    <button id="edit-delete">删除</button>
+    <button class="primary" id="edit-save">保存</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   状态
+   ===================================================================== */
+const state = {
+  docs: [],            // [{ path, group, label }]
+  notes: [],           // notes.json
+  activePath: null,
+  tab: 'contents',
+  sortOrder: 'asc',
+  notesShowAll: false,
+  query: '',
+};
+
+const $ = (id) => document.getElementById(id);
+
+/* =====================================================================
+   偏好 —— 首次渲染**之前**恢复，仅在缺失时才用默认值（§2.1）
+   ===================================================================== */
+const PREF = {
+  theme:     'ltm_theme',
+  sort:      'ltm_sort_order',
+  collapsed: 'ltm_sidebar_collapsed',
+  notesAll:  'ltm_notes_show_all',
+};
+
+function restorePreferences() {
+  const theme = localStorage.getItem(PREF.theme) || 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+
+  const sort = localStorage.getItem(PREF.sort);
+  state.sortOrder = sort === 'desc' ? 'desc' : 'asc';       // 已存的值优先
+
+  const collapsed = localStorage.getItem(PREF.collapsed) === 'true';
+  document.body.setAttribute('data-sidebar', collapsed ? 'collapsed' : 'open');
+
+  state.notesShowAll = localStorage.getItem(PREF.notesAll) === 'true';
+
+  syncControls();   // 控件必须显示**恢复后**的值，绝不是默认值
+}
+
+function syncControls() {
+  $('btn-sort').textContent = state.sortOrder === 'asc' ? '↑ 旧 → 新' : '↓ 新 → 旧';
+  $('btn-notes-scope').textContent = state.notesShowAll ? '全部文档' : '当前文档';
+  $('btn-theme').title = document.documentElement.getAttribute('data-theme') === 'dark'
+    ? '切换到亮色' : '切换到暗色';
+}
+
+$('btn-theme').addEventListener('click', () => {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem(PREF.theme, next);
+  syncControls();
+  // EXTENSION POINT D：在此切换 highlight.js 样式表的 href（§2.5.3）。
+});
+
+$('btn-sort').addEventListener('click', () => {
+  state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+  localStorage.setItem(PREF.sort, state.sortOrder);   // 在同一个 handler 内持久化
+  syncControls();
+  renderList();
+});
+
+$('btn-collapse').addEventListener('click', () => {
+  const collapsed = document.body.getAttribute('data-sidebar') !== 'collapsed';
+  document.body.setAttribute('data-sidebar', collapsed ? 'collapsed' : 'open');
+  localStorage.setItem(PREF.collapsed, String(collapsed));
+});
+
+$('btn-notes-scope').addEventListener('click', () => {
+  state.notesShowAll = !state.notesShowAll;
+  localStorage.setItem(PREF.notesAll, String(state.notesShowAll));
+  syncControls();
+  renderList();
+});
+
+/* =====================================================================
+   侧边栏
+   ===================================================================== */
+document.querySelectorAll('.tab').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b === btn));
+    state.tab = btn.dataset.tab;
+    // 排序只作用于 Contents；Notes 范围只作用于 Notes（§2、§3.1）
+    $('btn-sort').hidden = state.tab !== 'contents';
+    $('btn-notes-scope').hidden = state.tab !== 'notes';
+    renderList();
+  });
+});
+
+$('search').addEventListener('input', (e) => {
+  state.query = e.target.value.trim().toLowerCase();
+  renderList();
+});
+
+const matches = (...fields) =>
+  !state.query || fields.some((f) => String(f || '').toLowerCase().includes(state.query));
+
+function sortKey(doc) {
+  const m = doc.path.match(/(?:magazine|unit)(\d+)/i);
+  return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function renderList() {
+  const list = $('list');
+  list.innerHTML = '';
+
+  if (state.tab === 'contents') {
+    const docs = state.docs
+      .filter((d) => matches(d.label, d.path))
+      .sort((a, b) => (state.sortOrder === 'asc' ? sortKey(a) - sortKey(b) : sortKey(b) - sortKey(a)));
+
+    for (const group of ['magazines', 'units']) {
+      const inGroup = docs.filter((d) => d.group === group);
+      if (!inGroup.length) continue;
+      list.insertAdjacentHTML('beforeend', `<div class="group-label">${group}</div>`);
+      for (const doc of inGroup) {
+        const el = document.createElement('div');
+        el.className = 'item' + (doc.path === state.activePath ? ' active' : '');
+        el.textContent = doc.label;
+        el.addEventListener('click', () => openDoc(doc.path));
+        list.appendChild(el);
+      }
+    }
+    if (!docs.length) list.innerHTML = '<div class="empty">还没有文档。在 Phase 2 生成第一篇。</div>';
+    return;
+  }
+
+  if (state.tab === 'notes') {
+    const notes = state.notes
+      .filter((n) => state.notesShowAll || n.file === state.activePath)
+      .filter((n) => matches(n.word, n.userNoteRaw, n.note));
+    for (const n of notes) {
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.innerHTML = `<strong>${escapeHtml(n.word)}</strong><span class="sub">${escapeHtml(
+        (n.userNoteRaw || stripHtml(n.note) || '（高亮）').slice(0, 80))}</span>`;
+      el.addEventListener('click', () => jumpToAnnotation(n));
+      list.appendChild(el);
+    }
+    if (!notes.length) list.innerHTML = '<div class="empty">这里还没有注释。</div>';
+    return;
+  }
+
+  // EXTENSION POINT A：Concepts 标签页 —— 列出当前文档的术语（或 log.md 的
+  // Concept Ledger），点击时滚动到对应标题（§3、§5）。
+  list.innerHTML = '<div class="empty">概念：尚未实现。</div>';
+}
+
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const stripHtml = (s) => String(s ?? '').replace(/<[^>]*>/g, '');
+
+/* =====================================================================
+   加载
+   ===================================================================== */
+async function loadIndex() {
+  const [docs, notes] = await Promise.all([
+    fetch('/api/files').then((r) => r.json()).catch(() => []),
+    fetch('/api/notes').then((r) => r.json()).catch(() => []),
+  ]);
+  state.docs = Array.isArray(docs) ? docs : [];
+  state.notes = Array.isArray(notes) ? notes : [];
+  renderList();
+}
+
+async function openDoc(path) {
+  const res = await fetch('/api/file?path=' + encodeURIComponent(path));
+  const markdown = await res.text();
+  state.activePath = path;
+  state.markdown = markdown;      // 保留，便于重渲染注释时不必重新请求
+  $('doc-title').textContent = path;
+  renderDoc(markdown);
+  renderList();
+}
+
+function renderDoc(markdown) {
+  // EXTENSION POINT B：Markdown → HTML，然后是交互控件（§6）与可视化武器库
+  // 渲染管线（§11.2）。顺序是固定的：markdown → 控件 → 图表 →
+  // applyAnnotations → TOC（§10）。
+  $('doc').textContent = markdown;
+
+  applyAnnotations($('doc'), state.notes.filter((n) => n.file === state.activePath));
+}
+
+/* =====================================================================
+   §4.3 渲染注释 —— 全部出现都标记，且只有一处为 primary
+   ===================================================================== */
+const BLOCK_TAGS = new Set(['P','LI','TD','TH','H1','H2','H3','H4','H5','H6','BLOCKQUOTE','DT','DD']);
+const EXCLUDED_TAGS = new Set(['PRE','CODE','TEXTAREA','INPUT','BUTTON','SCRIPT','STYLE']);
+
+// visual_arsenal .viz-caption is a <p>, so BLOCK_TAGS already covers it. .viz-block-body
+// is a plain <div> (visual_arsenal.md §"blocks"), and DIV is deliberately NOT block-level
+// in general — see walk() below — so it needs an explicit class check here. Without this,
+// diagram captions render fine (they're already <p>) but text inside a flowchart/block box
+// can never be selected or highlighted: capture would find no ancestor block, so any
+// selection there was silently dropped (frontend_spec §4.2/§4.3).
+function isAnnotatableBlock(el) {
+  return !!el && (BLOCK_TAGS.has(el.tagName) || el.classList?.contains('viz-block-body'));
+}
+
+function applyAnnotations(container, annotations) {
+  const valid = (annotations || []).filter((n) => n && n.word);
+  if (!valid.length) return;
+
+  // 按长度降序，否则短词会吞掉包含它的短语。
+  const sorted = [...valid].sort((a, b) => b.word.length - a.word.length);
+  const patterns = sorted.map((ann) => {
+    let p = ann.word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    if (/^\w/.test(ann.word)) p = '\\b' + p;
+    if (/\w$/.test(ann.word)) p = p + '\\b';
+    return p;
+  });
+  const regex = new RegExp('(' + patterns.join('|') + ')', 'gi');
+
+  function excluded(node) {
+    for (let cur = node.parentNode; cur && cur !== container; cur = cur.parentNode) {
+      if (EXCLUDED_TAGS.has(cur.tagName) || cur.classList?.contains('annotated-word')) return true;
+    }
+    return false;
+  }
+
+  function processBlock(block) {
+    const textNodes = [];
+    (function collect(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (node.nodeValue && !excluded(node)) textNodes.push(node);
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        Array.from(node.childNodes).forEach(collect);
+      }
+    })(block);
+    if (!textNodes.length) return;
+
+    // 拼接整块，让被 <em>/<strong> 劈开的短语仍能匹配。
+    let offset = 0;
+    const segments = textNodes.map((n) => {
+      const seg = { node: n, start: offset, end: offset + n.nodeValue.length, text: n.nodeValue };
+      offset += n.nodeValue.length;
+      return seg;
+    });
+    const combined = segments.map((s) => s.text).join('');
+
+    regex.lastIndex = 0;
+    const found = [];
+    let lastEnd = 0, m;
+    while ((m = regex.exec(combined)) !== null) {
+      if (m.index < lastEnd) continue;                       // 保持匹配互不重叠
+      const word = m[0].toLowerCase();
+
+      // 两条**独立**的注释可能共用同一个词（比如 "coffee" 在第 1 段和第 5 段
+      // 各自写了不同的备注）。取"数组里第一个同词注释"会把第 5 段的出现错误
+      // 关联到第 1 段的注释——悬浮提示、点击编辑目标全部指向错处，保存时还会
+      // 覆盖那条不相关的注释。优先选"自身 context 就是当前块"的候选；同一块内
+      // 同一个词被标注多次时，优先选偏移最接近这次匹配位置的那条。只有当没有
+      // 任何候选属于当前块时，才退回"任意一条同词注释"——对应最常见的情形：
+      // 只有一条真实备注，这个词在别处只是重复出现的回声。
+      const candidates = sorted.filter((a) => a.word.toLowerCase() === word);
+      const sameBlock = candidates.filter((a) => a.context && combined.trim() === String(a.context).trim());
+      const ann = sameBlock.length > 1
+        ? sameBlock.reduce((best, a) => {
+          const d = Math.abs(m.index - Number(a.contextOffset));
+          const bd = Math.abs(m.index - Number(best.contextOffset));
+          return d < bd ? a : best;
+        })
+        : (sameBlock[0] || candidates[0]);
+      if (!ann) continue;
+
+      // 核心锚定规则：块文本相同，且偏移落在 3 字符以内（§4.3）。
+      const isPrimary = !!(ann.context
+        && combined.trim() === String(ann.context).trim()
+        && Math.abs(m.index - Number(ann.contextOffset)) < 3);
+      found.push({ start: m.index, end: m.index + m[0].length, ann, isPrimary });
+      lastEnd = m.index + m[0].length;
+    }
+    if (!found.length) return;
+
+    const perSegment = segments.map(() => []);
+    for (const match of found) {
+      segments.forEach((seg, i) => {
+        if (seg.end <= match.start || seg.start >= match.end) return;
+        perSegment[i].push({
+          localStart: Math.max(match.start, seg.start) - seg.start,
+          localEnd: Math.min(match.end, seg.end) - seg.start,
+          ann: match.ann,
+          isPrimary: match.isPrimary,
+        });
+      });
+    }
+
+    // 逆序：正序重建会让后续偏移全部失效。
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const hits = perSegment[i];
+      if (!hits.length) continue;
+      const { node, text } = segments[i];
+      hits.sort((a, b) => a.localStart - b.localStart);
+
+      const frag = document.createDocumentFragment();
+      let cursor = 0;
+      for (const hit of hits) {
+        if (hit.localStart > cursor) frag.appendChild(document.createTextNode(text.slice(cursor, hit.localStart)));
+        const span = document.createElement('span');
+        span.className = 'annotated-word' + (hit.ann.isHighlight ? ' custom-highlight' : '');
+        span.setAttribute('data-id', hit.ann.id || '');
+        span.setAttribute('data-word', hit.ann.word);
+        span.setAttribute('data-note', hit.ann.userNoteRaw || '');
+        if (hit.isPrimary) span.setAttribute('data-primary', 'true');
+        span.textContent = text.slice(hit.localStart, hit.localEnd);
+        frag.appendChild(span);
+        cursor = hit.localEnd;
+      }
+      if (cursor < text.length) frag.appendChild(document.createTextNode(text.slice(cursor)));
+      node.parentNode.replaceChild(frag, node);
+    }
+  }
+
+  (function walk(node) {
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (isAnnotatableBlock(node)) processBlock(node);
+    else Array.from(node.children).forEach(walk);
+  })(container);
+}
+
+/* =====================================================================
+   §4.4 跳转 —— 四级回退，绝不乱滚到无关位置
+   ===================================================================== */
+async function jumpToAnnotation(note) {
+  if (note.file !== state.activePath) {
+    await openDoc(note.file);            // 定位前先 await 渲染完成
+  }
+  const spans = Array.from(document.querySelectorAll('.annotated-word'));
+  const target =
+    spans.find((s) => s.dataset.id === note.id && s.dataset.primary === 'true') ||
+    spans.find((s) => s.dataset.id === note.id) ||
+    spans.find((s) => s.textContent.trim().toLowerCase() === String(note.word).toLowerCase());
+
+  if (!target) {
+    setSaveStatus('failed', '锚点已失效');   // 告知用户，不要猜
+    return;
+  }
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  target.classList.add('flash');
+  setTimeout(() => target.classList.remove('flash'), 2000);
+}
+
+/* =====================================================================
+   §4.2 捕获 —— 先吸附，后测量
+   ===================================================================== */
+let pending = null;   // { word, context, contextOffset }
+
+function snapRangeToWordBoundaries(range) {
+  const isWordChar = (ch) => ch && /[\wÀ-ÿ']/.test(ch);
+  if (range.startContainer.nodeType === Node.TEXT_NODE) {
+    const text = range.startContainer.nodeValue;
+    let start = range.startOffset;
+    while (start > 0 && isWordChar(text[start - 1])) start--;
+    range.setStart(range.startContainer, start);
+  }
+  if (range.endContainer.nodeType === Node.TEXT_NODE) {
+    const text = range.endContainer.nodeValue;
+    let end = range.endOffset;
+    while (end < text.length && isWordChar(text[end])) end++;
+    range.setEnd(range.endContainer, end);
+  }
+}
+
+document.addEventListener('mouseup', (e) => {
+  if (e.target.closest('.float')) return;
+  const selection = window.getSelection();
+  const raw = selection.toString().trim();
+
+  if (!raw || raw.includes('\n') || raw.length >= 150) { closeFloats(); return; }
+  if (!selection.rangeCount) { closeFloats(); return; }
+
+  const range = selection.getRangeAt(0);
+  if (!$('doc').contains(range.startContainer)) { closeFloats(); return; }
+
+  snapRangeToWordBoundaries(range);            // 1. 吸附
+  selection.removeAllRanges();
+  selection.addRange(range);                   // 2. 让用户看到将被保存的范围
+
+  const word = range.toString().trim();        // 3. 此时才测量
+  let block = range.startContainer.nodeType === Node.ELEMENT_NODE
+    ? range.startContainer : range.startContainer.parentNode;
+  while (block && block !== $('doc') && !isAnnotatableBlock(block)) block = block.parentNode;
+
+  let context = '', contextOffset = 0;
+  if (block && block !== $('doc')) {
+    context = block.textContent;
+    const pre = range.cloneRange();
+    pre.selectNodeContents(block);
+    pre.setEnd(range.startContainer, range.startOffset);
+    contextOffset = pre.toString().length;
+  }
+
+  pending = { word, context, contextOffset };
+  openFloat($('float-add'), e.clientX, e.clientY);
+  $('add-note').value = '';
+  $('add-note').focus();
+});
+
+function openFloat(el, x, y) {
+  closeFloats();
+  el.style.left = Math.min(x, window.innerWidth - 320) + 'px';
+  el.style.top = (y + window.scrollY + 12) + 'px';
+  el.classList.add('open');
+}
+function closeFloats() { document.querySelectorAll('.float').forEach((f) => f.classList.remove('open')); }
+
+$('add-save').addEventListener('click', () => saveAnnotation($('add-note').value.trim(), false));
+$('add-highlight').addEventListener('click', () => saveAnnotation('', true));
+
+async function saveAnnotation(text, isHighlight) {
+  if (!pending || !pending.word) return;
+  const note = {
+    id: 'note-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
+    file: state.activePath,
+    word: pending.word,
+    context: pending.context,
+    contextOffset: pending.contextOffset,
+    userNoteRaw: text,
+    note: text,
+    isHighlight,
+    time: new Date().toISOString(),
+  };
+  state.notes.push(note);
+  closeFloats();
+  window.getSelection().removeAllRanges();
+  await persistNotes();
+  renderDoc(state.markdown || '');   // 重渲染，让新 span 出现
+  renderList();                      // 新注释立即出现在侧栏（§3）
+}
+
+async function persistNotes() {
+  setSaveStatus('saving');
+  try {
+    // 由服务器做 Smart Merge —— 绝不能丢掉已有的 aiReview（§7.2）。
+    const res = await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state.notes),
+    });
+    setSaveStatus(res.ok ? 'saved' : 'failed');
+  } catch {
+    setSaveStatus('failed');
+  }
+}
+
+function setSaveStatus(stateName, label) {
+  const el = $('save-status');
+  el.dataset.state = stateName;
+  el.textContent = label || { saving: '保存中…', saved: '已保存', dirty: '未保存', failed: '保存失败' }[stateName] || '';
+}
+
+// EXTENSION POINT C：点击 .annotated-word 时打开 #float-edit 并预填注释内容；
+// 保存时必须保留 id / context / contextOffset / aiReview，使纯高亮可以就地升级
+// 为注释（§4.1）。
+
+/* =====================================================================
+   启动 —— 先偏好，后数据
+   ===================================================================== */
+restorePreferences();
+$('btn-notes-scope').hidden = true;
+loadIndex();
+</script>
+</body>
+</html>
