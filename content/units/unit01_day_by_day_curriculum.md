@@ -1,4 +1,4 @@
-# Academic Writing — Day-by-Day Curriculum
+# Unit 01: 5-Day Blueprint — Day-by-Day Curriculum (Day 01–05)
 
 ## Unit 01: 5-Day Blueprint — From Zero to Academic Writer
 
@@ -44,21 +44,22 @@
 
 *Hình trên: Mô hình Chiếc đồng hồ cát (The Hourglass Model) — phần Mở bài thu hẹp từ rộng đến điểm hẹp nhất là Thesis Statement, sau đó phần Thân bài và Kết bài mở rộng trở lại.*
 
+<!-- visual: flow | id: F01 | title: The Hourglass Flowchart | purpose: 流程图展示论文沙漏结构 -->
 ```mermaid
 flowchart TD
-  Intro["1. INTRODUCTION (Broad to Narrow)"] --> Hook["Hook & Background Context"]
+  Intro["1. INTRODUCTION<br/>(Broad to Narrow)"] --> Hook["Hook & Background Context"]
   Hook --> Problem["Problem Statement & Niche"]
   Problem --> Thesis["THESIS STATEMENT — Narrowest Point"]
 
-  Thesis --> Body["2. BODY PARAGRAPHS (Focused Analysis)"]
-  Body --> P1["Body 1: Core Claim 1 + Evidence + Warrant"]
-  Body --> P2["Body 2: Core Claim 2 + Evidence + Warrant"]
-  Body --> P3["Body 3: Counter-Argument & Rebuttal"]
+  Thesis --> Body["2. BODY PARAGRAPHS<br/>(Focused Analysis)"]
+  Body --> P1["Body 1: Core Claim 1<br/>+ Evidence + Warrant"]
+  Body --> P2["Body 2: Core Claim 2<br/>+ Evidence + Warrant"]
+  Body --> P3["Body 3: Counter-Argument<br/>& Rebuttal"]
 
-  Body --> Conc["3. CONCLUSION (Narrow to Broad)"]
+  Body --> Conc["3. CONCLUSION<br/>(Narrow to Broad)"]
   Conc --> Restate["Restate Thesis in New Words"]
   Conc --> Synthesis["Synthesis of Main Arguments"]
-  Conc --> SoWhat["Broader Significance / 'So What?'"]
+  Conc --> SoWhat["Broader Significance<br/>/ 'So What?'"]
 ```
 
 ---
@@ -181,6 +182,7 @@ flowchart TD
 
 ### 🗺️ Thesis Generation Pipeline
 
+<!-- visual: flow | id: F02 | title: Thesis Generation Pipeline | purpose: 展示三段式论点提炼流程 -->
 ```mermaid
 flowchart LR
   Step1["1. Raw Topic<br>(Vague subject area)"] --> Step2["2. Focused Stance<br>(Arguable position)"]

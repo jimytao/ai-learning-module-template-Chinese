@@ -116,7 +116,8 @@ function validateFile(filePath) {
     errors.push(`T/F: found ${tfStems} stems but only ${tfAnswers} answer comments`);
   }
 
-  if (/___/.test(content) && /```[\s\S]*?___[\s\S]*?```/.test(content)) {
+  const fencedBlocks = content.match(/```[\s\S]*?```/g) || [];
+  if (fencedBlocks.some((block) => /___/.test(block))) {
     errors.push('Possible blank "___" inside fenced code block (will not render as input)');
   }
 

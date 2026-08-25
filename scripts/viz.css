@@ -160,10 +160,13 @@
   fill: #1e293b !important;
   stroke: #38bdf8 !important;
   stroke-width: 1.5px !important;
+  rx: 6px;
+  ry: 6px;
 }
 
 .mermaid .node .label,
 .mermaid .node text,
+.mermaid .node tspan,
 .mermaid .nodeLabel,
 .mermaid text,
 .mermaid .node foreignObject,
@@ -171,16 +174,17 @@
 .mermaid .node div {
   color: #f1f5f9 !important;
   fill: #f1f5f9 !important;
-  font-weight: 600;
-  font-size: 0.92rem;
-  line-height: 1.4;
+  font-family: 'Outfit', 'Noto Sans TC', system-ui, sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  line-height: 1.35;
 }
 
-/* Vertical centering — foreignObject path (dark theme / loose securityLevel) */
+/* Vertical and horizontal centering inside HTML foreignObject label.
+   The JS in renderMermaid() stretches each foreignObject to the full rect
+   height and resets its y, so height:100% on the inner div resolves to the
+   rect height (not the text height) and justify-content:center works. */
 .mermaid .node foreignObject {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
   overflow: visible !important;
 }
 
@@ -196,11 +200,14 @@
   height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
+  white-space: normal !important;
+  word-break: break-word !important;
   box-sizing: border-box !important;
 }
 
 /* Vertical centering — direct SVG <text> path */
-.mermaid .node text {
+.mermaid .node text,
+.mermaid .node tspan {
   dominant-baseline: central !important;
   text-anchor: middle !important;
 }
@@ -237,6 +244,7 @@
 
 :root[data-theme="light"] .mermaid .node .label,
 :root[data-theme="light"] .mermaid .node text,
+:root[data-theme="light"] .mermaid .node tspan,
 :root[data-theme="light"] .mermaid .nodeLabel,
 :root[data-theme="light"] .mermaid text,
 :root[data-theme="light"] .mermaid .node foreignObject,

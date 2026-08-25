@@ -1,4 +1,4 @@
-# Academic Writing Learning Magazine
+# Magazine 01: The Blueprint of Academic Writing — Anatomy, Reader Expectation & Thesis Power
 
 ## Magazine.01: The Blueprint of Academic Writing — Anatomy, Reader Expectation & Thesis Power
 
@@ -38,19 +38,19 @@ Mô hình kinh điển và vững chắc nhất để tổ chức một bài lu�
 <!-- visual: tree | id: T01 | title: The Hourglass Essay Architecture | purpose: 展示学术论文沙漏结构层级与各段核心使命 -->
 ```mermaid
 flowchart TD
-  Intro["1. INTRODUCTION (Broad to Narrow)"] --> Hook["Hook & Background Context (Bối cảnh chung)"]
-  Hook --> Problem["Problem Statement & Niche (Xác định khoảng trống/vấn đề)"]
-  Problem --> Thesis["THESIS STATEMENT (Luận điểm trọng tâm — Điểm hẹp nhất)"]
+  Intro["1. INTRODUCTION<br/>(Broad to Narrow)"] --> Hook["Hook & Background Context<br/>(Bối cảnh chung)"]
+  Hook --> Problem["Problem Statement & Niche<br/>(Xác định khoảng trống/vấn đề)"]
+  Problem --> Thesis["THESIS STATEMENT<br/>(Luận điểm trọng tâm — Điểm hẹp nhất)"]
   
-  Thesis --> Body["2. BODY PARAGRAPHS (Focused Analysis)"]
-  Body --> P1["Body 1: Core Claim 1 + Evidence + Warrant"]
-  Body --> P2["Body 2: Core Claim 2 + Evidence + Warrant"]
-  Body --> P3["Body 3: Counter-Argument & Rebuttal"]
+  Thesis --> Body["2. BODY PARAGRAPHS<br/>(Focused Analysis)"]
+  Body --> P1["Body 1: Core Claim 1<br/>+ Evidence + Warrant"]
+  Body --> P2["Body 2: Core Claim 2<br/>+ Evidence + Warrant"]
+  Body --> P3["Body 3: Counter-Argument<br/>& Rebuttal"]
   
-  Body --> Conc["3. CONCLUSION (Narrow to Broad)"]
-  Conc --> Restate["Restated Thesis in New Words (Khẳng định lại luận điểm)"]
-  Conc --> Synthesis["Synthesis of Main Arguments (Tổng hợp bức tranh toàn cảnh)"]
-  Conc --> SoWhat["Broader Significance / 'So What?' (Ý nghĩa mở rộng & Tương lai)"]
+  Body --> Conc["3. CONCLUSION<br/>(Narrow to Broad)"]
+  Conc --> Restate["Restated Thesis in New Words<br/>(Khẳng định lại luận điểm)"]
+  Conc --> Synthesis["Synthesis of Main Arguments<br/>(Tổng hợp bức tranh toàn cảnh)"]
+  Conc --> SoWhat["Broader Significance / 'So What?'<br/>(Ý nghĩa mở rộng & Tương lai)"]
 ```
 
 - **Introduction (Phần Mở bài)**: Bắt đầu từ bối cảnh học thuật rộng lớn, sau đó thu hẹp dần vào vấn đề cụ thể cần giải quyết, và kết thúc bằng câu luận điểm (**Thesis Statement**) — điểm hẹp nhất và quan trọng nhất của phần mở đầu.
