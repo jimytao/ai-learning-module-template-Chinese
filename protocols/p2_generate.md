@@ -71,7 +71,7 @@ content/magazines/magazine[NN]_[topic_slug].md
 ### 结构（必须）
 
 ```
-# [Subject] Learning Magazine
+# Magazine NN: [Topic Title] — [Subtitle / Scope]
 ## Magazine.NN: [期刊标题]
 ### Block 1: Articles
 #### Article A / B / C
@@ -112,7 +112,7 @@ content/units/unit[NN]_[topic_slug].md
 ### 推荐结构
 
 ```
-# Unit.NN: [标题]
+# Unit NN: [Topic Title] — [Scope / Days] (Day 01–05)
 ## Part 0: Cold Start Recall（无提示复现前序 2–3 点）
 ## Part 1: Core Concepts（5–12 个，可配图）
 ## Part 2: Guided Questions（[Your Answer]）

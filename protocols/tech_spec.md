@@ -6,6 +6,32 @@
 
 ---
 
+## 0. 内容文件与标题序号规范（Naming & Title Conventions）
+
+> **阅读器目录契约**：阅读器侧栏（Contents Tab）直接抓取每个 Markdown 文件的**第一行一级标题（`# H1`）**作为列表展示名。为了确保用户能直观识别单元序号、期刊序号与覆盖天数，所有生成内容必须严格遵循以下命名与标题格式。
+
+### 0.1 文件路径与序号命名
+
+| 模态类别 | 文件存放路径 | 文件名规范 | 示例 |
+| :--- | :--- | :--- | :--- |
+| **Unit（课本单元）** | `content/units/` | `unit[NN]_[topic_slug].md` | `content/units/unit01_academic_writing_blueprint.md` |
+| **Magazine（深度期刊）** | `content/magazines/` | `magazine[NN]_[topic_slug].md` | `content/magazines/magazine01_academic_writing_blueprint.md` |
+
+- `[NN]` 为两位数序号（`01`, `02`, `03`...），用于侧栏升降序排序。
+
+### 0.2 文档一级标题（`# H1`）规范
+
+- **Unit 文件第 1 行**：必须包含 `Unit NN` 序号及所辖天数范围（如 `Day 01–05`）：
+  ```markdown
+  # Unit 01: 5-Day Blueprint — Day-by-Day Curriculum (Day 01–05)
+  ```
+- **Magazine 文件第 1 行**：必须包含 `Magazine NN` 序号及核心主题：
+  ```markdown
+  # Magazine 01: The Blueprint of Academic Writing — Anatomy, Reader Expectation & Thesis Power
+  ```
+
+---
+
 ## 1. 填空题（Inline Blanks）
 
 | 用途 | 写法 | 结果 |

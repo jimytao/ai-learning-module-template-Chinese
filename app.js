@@ -60,14 +60,14 @@
     maxTextSize: 50000,
     themeVariables: {
       fontSize: '14px',
-      fontFamily: 'var(--font-body, system-ui, sans-serif)'
+      fontFamily: 'Outfit, "Noto Sans TC", system-ui, -apple-system, sans-serif'
     },
     flowchart: {
       htmlLabels: true,
       curve: 'basis',
       nodeSpacing: 25,
       rankSpacing: 35,
-      padding: 10
+      padding: 12
     }
   });
   window.marked.setOptions({ gfm: true, breaks: false });
@@ -253,6 +253,20 @@
     }
   }
 
+  // §mermaid label centering — mermaid renders each node label as
+  // <foreignObject><div style="...">...<span><p>text</p></span></div></foreignObject>.
+  // DOMPurify enforces HTML namespace-integration rules BEFORE consulting
+  // ADD_TAGS/ADD_ATTR: by default only <annotation-xml> (MathML) is treated as
+  // an "HTML integration point", so any <div>/<span>/<p> living inside an SVG
+  // <foreignObject> is considered impossible per spec and is stripped
+  // entirely — no amount of ADD_TAGS/ADD_ATTR can save it. That silently
+  // deleted the label wrapper div (and its centering-relevant inline style),
+  // leaving bare text at the foreignObject's default top-left position, which
+  // is why the centering CSS in scripts/viz.css never had anything to act on.
+  // Passing HTML_INTEGRATION_POINTS: { foreignobject: true } fixes the root
+  // cause; ADD_TAGS/ADD_ATTR/style are still needed so the div/span/p elements
+  // and their attributes/inline style survive the tag & attribute allowlists.
+
   async function renderMermaid() {
     const blocks = [...elements.reader.querySelectorAll('pre > code.language-mermaid')];
     for (const [index, code] of blocks.entries()) {
@@ -263,8 +277,9 @@
         const host = document.createElement('div');
         host.className = 'mermaid';
         host.innerHTML = DOMPurify.sanitize(result.svg, {
-          USE_PROFILES: { svg: true, svgFilters: true },
-          ADD_TAGS: ['foreignObject', 'style'],
+          USE_PROFILES: { svg: true, svgFilters: true, html: true },
+          ADD_TAGS: ['foreignObject', 'style', 'div', 'span', 'p'],
+          HTML_INTEGRATION_POINTS: { foreignobject: true },
           ADD_ATTR: [
             'dominant-baseline',
             'text-anchor',
@@ -279,43 +294,15 @@
             'marker-start',
             'class',
             'rx', 'ry',
-            'x1', 'y1', 'x2', 'y2'
+            'x1', 'y1', 'x2', 'y2',
+            'xmlns',
+            'style'
           ],
+          FORBID_ATTR: [],
+
           FORBID_TAGS: ['script']
         });
         pre.replaceWith(host);
-
-        // Auto-fit node box heights snugly to their actual text content
-        for (const nodeEl of host.querySelectorAll('.node')) {
-          const rect = nodeEl.querySelector('rect');
-          const fo = nodeEl.querySelector('foreignObject');
-          if (!rect || !fo) continue;
-
-          const labelEl = fo.querySelector('.nodeLabel') || fo.firstElementChild || fo;
-          const textH = Math.ceil(labelEl ? (labelEl.offsetHeight || labelEl.scrollHeight || labelEl.getBoundingClientRect().height) : 0);
-          if (textH <= 0) continue;
-
-          const vPadding = 10;
-          const newRectH = textH + vPadding * 2;
-
-          // Adjust rect height and center around 0
-          rect.setAttribute('y', (-newRectH / 2).toFixed(1));
-          rect.setAttribute('height', newRectH.toFixed(1));
-
-          // Adjust foreignObject height and center around 0
-          fo.setAttribute('y', (-textH / 2).toFixed(1));
-          fo.setAttribute('height', textH.toFixed(1));
-
-          // Ensure any wrapping label <g> is centered at 0 vertically
-          const labelG = nodeEl.querySelector('.label');
-          if (labelG) {
-            const transform = labelG.getAttribute('transform') || '';
-            const match = transform.match(/translate\(\s*([-\d.]+)/);
-            if (match) {
-              labelG.setAttribute('transform', `translate(${match[1]}, 0)`);
-            }
-          }
-        }
       } catch (error) {
         const details = document.createElement('details');
         details.className = 'mermaid-error';
